@@ -27,6 +27,26 @@ now_p = re.compile('now=[0-9]+')
 urls = dict()
 
 
+class URLStat:
+    def __init__(self, url, time_from, time_until):
+        self.url = url
+        self.count = 1
+        self.time_from = time_from
+        self.time_until = time_until
+
+
+def diff(x, y):
+    if x is None:
+        x = 0
+    if y is None:
+        y = 0
+    return x - y
+
+
+def urlstat_compare(x, y):
+    return diff(x.time_until, x.time_from) - diff(y.time_until, y.time_from)
+
+
 def timestamp_diff_format(t_from, t_until):
     e = int((t_from - t_until) / 60) * 60
     if e == 0:
@@ -39,7 +59,7 @@ def timestamp_tz(param, tz):
     if param is None:
         return None
     t = int(param[0])
-    return datetime.fromtimestamp(t, tz).timestamp()
+    return int(datetime.fromtimestamp(t, tz).timestamp())
 
 
 def parse_line(line):
@@ -47,7 +67,7 @@ def parse_line(line):
     if m:
         dt = dateutil.parser.parse(m.group(1))
         json_line = json.loads(m.group(2))
-        json_line['time'] = dt.timestamp()
+        json_line['time'] = int(dt.timestamp())
 
         parsed = urlparse.urlparse(json_line['url'])
         params = urlparse.parse_qs(parsed.query)
@@ -55,35 +75,43 @@ def parse_line(line):
         time_until = timestamp_tz(params.get('until'), dt.tzinfo)
         time_now = timestamp_tz(params.get('now'), dt.tzinfo)
 
+        duration = 0
         if time_from is not None:
-            json_line['url'] = from_p.sub(
-                "from=${TIMESTAMP}%s" %
-                timestamp_diff_format(time_from, json_line['time']),
-                json_line['url'])
+            json_line['url'] = from_p.sub("from=${FROM}", json_line['url'])
         if time_until is not None:
-            json_line['url'] = until_p.sub(
-                "until=${TIMESTAMP}%s" %
-                timestamp_diff_format(time_until, json_line['time']),
-                json_line['url'])
+            json_line['url'] = until_p.sub("until=${UNTIL}", json_line['url'])
+            duration = time_until - time_from
         if time_now is not None:
-            json_line['url'] = now_p.sub(
-                "now=${TIMESTAMP}%s" %
-                timestamp_diff_format(time_now, json_line['time']),
-                json_line['url'])
+            if time_from is None:
+                sys.stderr.write("error on url '%s': from not found\n" %
+                                 json_line['url'])
+                return
+            if time_until is not None:
+                sys.stderr.write("error on url %s: until and now set\n" %
+                                 json_line['url'])
+                return
+            json_line['url'] = now_p.sub("now=${UNTIL}", json_line['url'])
+            time_until = time_now
+            duration = time_now - time_from
+
+        if duration < 0:
+            return
 
         url_count = urls.get(json_line['url'])
         if url_count is None:
-            urls[json_line['url']] = 1
+            urls[json_line['url']] = URLStat(json_line['url'], time_from,
+                                             time_until)
         else:
-            urls[json_line['url']] += 1
+            urls[json_line['url']].count += 1
 
 
 def main():
     for line in sys.stdin:
         parse_line(line)
 
-    for k in urls:
-        print("%d %s" % (urls[k], k))
+    for u in sorted(urls.values(),
+                    key=lambda x: diff(x.time_until, x.time_from)):
+        print("%s %s %s" % (u.url, u.time_from, u.time_until))
 
 
 if __name__ == "__main__":
