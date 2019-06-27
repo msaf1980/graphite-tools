@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 # Extract queries in graphite-clickhouse logs
+# Python 3.3 or greater required
 
 import sys
 import re
@@ -77,9 +78,9 @@ def parse_line(line):
 
         duration = 0
         if time_from is not None:
-            json_line['url'] = from_p.sub("from=${FROM}", json_line['url'])
+            json_line['url'] = from_p.sub("from=<FROM>", json_line['url'])
         if time_until is not None:
-            json_line['url'] = until_p.sub("until=${UNTIL}", json_line['url'])
+            json_line['url'] = until_p.sub("until=<UNTIL>", json_line['url'])
             duration = time_until - time_from
         if time_now is not None:
             if time_from is None:
@@ -90,7 +91,7 @@ def parse_line(line):
                 sys.stderr.write("error on url %s: until and now set\n" %
                                  json_line['url'])
                 return
-            json_line['url'] = now_p.sub("now=${UNTIL}", json_line['url'])
+            json_line['url'] = now_p.sub("now=<UNTIL>", json_line['url'])
             time_until = time_now
             duration = time_now - time_from
 
@@ -101,17 +102,32 @@ def parse_line(line):
         if url_count is None:
             urls[json_line['url']] = URLStat(json_line['url'], time_from,
                                              time_until)
+            urls[json_line['url']].duration = duration
         else:
             urls[json_line['url']].count += 1
+            if duration > diff(urls[json_line['url']].time_until,
+                               urls[json_line['url']].time_from):
+                urls[json_line['url']].time_from = time_from
+                urls[json_line['url']].time_until = time_until
 
 
 def main():
+    short_form = True
+    if len(sys.argv) > 2 and sys.argv[1] in ("-", "--long"):
+        short_form = False
+
     for line in sys.stdin:
         parse_line(line)
 
+    urls_proc = set()
     for u in sorted(urls.values(),
                     key=lambda x: diff(x.time_until, x.time_from)):
-        print("%s %s %s" % (u.url, u.time_from, u.time_until))
+        if short_form:
+            if u.url not in urls_proc:
+                print(u.url)
+                urls_proc.add(u.url)
+        else:
+            print("%s %s %s" % (u.url, u.time_from, u.time_until))
 
 
 if __name__ == "__main__":
