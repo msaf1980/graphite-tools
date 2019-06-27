@@ -64,6 +64,16 @@
             <stringProp name="Argument.value">${__P(ramp_up, 120)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
+          <elementProp name="delay" elementType="Argument">
+            <stringProp name="Argument.name">delay</stringProp>
+            <stringProp name="Argument.value">${__P(delay, 100)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="timeout" elementType="Argument">
+            <stringProp name="Argument.name">timeout</stringProp>
+            <stringProp name="Argument.value">${__P(timeout, 20000)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
         </collectionProp>
       </Arguments>
       <hashTree/>
@@ -89,10 +99,10 @@
         <stringProp name="HTTPSampler.path"></stringProp>
         <stringProp name="HTTPSampler.concurrentPool">6</stringProp>
         <stringProp name="HTTPSampler.connect_timeout">500</stringProp>
-        <stringProp name="HTTPSampler.response_timeout">120</stringProp>
+        <stringProp name="HTTPSampler.response_timeout">${timeout}</stringProp>
       </ConfigTestElement>
       <hashTree/>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group (Test)" enabled="true">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group (Healthcheck)" enabled="true">
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
           <boolProp name="LoopController.continue_forever">false</boolProp>
@@ -110,14 +120,14 @@
           <stringProp name="filename"></stringProp>
           <stringProp name="parameters"></stringProp>
           <stringProp name="script">Date date = new Date();
-UNTIL = date.getTime() / 1000).intValue();
+UNTIL = (date.getTime() / 1000).intValue();
 FROM = UNTIL - 600; // - 10 min
 
-url = &quot;/render/?format=protobuf&amp;from=&quot; + String.valueOf(UNTIL) + &quot;&amp;target=NonExistingTarget&amp;until=&quot; + String.valueOf(FROM);
+url_check = &quot;/render/?format=protobuf&amp;from=&quot; + String.valueOf(UNTIL) + &quot;&amp;target=NonExistingTarget&amp;until=&quot; + String.valueOf(FROM);
 
-//log.info(url);
+//log.info(url_check);
 
-vars.put(&quot;url_rewrite&quot;, url);</stringProp>
+vars.put(&quot;url_check&quot;, url_check);</stringProp>
           <stringProp name="scriptLanguage">groovy</stringProp>
         </JSR223PreProcessor>
         <hashTree/>
@@ -129,7 +139,7 @@ vars.put(&quot;url_rewrite&quot;, url);</stringProp>
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">${url_rewrite}</stringProp>
+          <stringProp name="HTTPSampler.path">${url_check}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -141,7 +151,7 @@ vars.put(&quot;url_rewrite&quot;, url);</stringProp>
         </HTTPSamplerProxy>
         <hashTree/>
         <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Constant Timer" enabled="true">
-          <stringProp name="ConstantTimer.delay">2000</stringProp>
+          <stringProp name="ConstantTimer.delay">${delay}</stringProp>
         </ConstantTimer>
         <hashTree/>
       </hashTree>
@@ -176,9 +186,9 @@ url = url.replaceAll(&quot;&lt;FROM&gt;&quot;, String.valueOf(FROM));
 url = url.replaceAll(&quot;&lt;UNTIL&gt;&quot;, String.valueOf(UNTIL));
 
 //log.info(url);
-//log.info(vars.get(&apos;timestamp&apos;));
 
-vars.put(&quot;url_rewrite&quot;, url);</stringProp>
+vars.put(&quot;url_3_hour&quot;, url);
+</stringProp>
           <stringProp name="scriptLanguage">groovy</stringProp>
         </JSR223PreProcessor>
         <hashTree/>
@@ -190,7 +200,7 @@ vars.put(&quot;url_rewrite&quot;, url);</stringProp>
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">${url_rewrite}</stringProp>
+          <stringProp name="HTTPSampler.path">${url_3_hour}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -200,6 +210,10 @@ vars.put(&quot;url_rewrite&quot;, url);</stringProp>
           <stringProp name="HTTPSampler.connect_timeout"></stringProp>
           <stringProp name="HTTPSampler.response_timeout"></stringProp>
         </HTTPSamplerProxy>
+        <hashTree/>
+        <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Constant Timer" enabled="true">
+          <stringProp name="ConstantTimer.delay">${delay}</stringProp>
+        </ConstantTimer>
         <hashTree/>
       </hashTree>
       <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group (1 day)" enabled="true">
@@ -235,7 +249,7 @@ url = url.replaceAll(&quot;&lt;UNTIL&gt;&quot;, String.valueOf(UNTIL));
 //log.info(url);
 //log.info(vars.get(&apos;timestamp&apos;));
 
-vars.put(&quot;url_rewrite&quot;, url);</stringProp>
+vars.put(&quot;url_1_day&quot;, url);</stringProp>
           <stringProp name="scriptLanguage">groovy</stringProp>
         </JSR223PreProcessor>
         <hashTree/>
@@ -247,7 +261,7 @@ vars.put(&quot;url_rewrite&quot;, url);</stringProp>
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">${url_rewrite}</stringProp>
+          <stringProp name="HTTPSampler.path">${url_1_day}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -257,6 +271,10 @@ vars.put(&quot;url_rewrite&quot;, url);</stringProp>
           <stringProp name="HTTPSampler.connect_timeout"></stringProp>
           <stringProp name="HTTPSampler.response_timeout"></stringProp>
         </HTTPSamplerProxy>
+        <hashTree/>
+        <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Constant Timer" enabled="true">
+          <stringProp name="ConstantTimer.delay">${delay}</stringProp>
+        </ConstantTimer>
         <hashTree/>
       </hashTree>
       <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group (1 week)" enabled="true">
@@ -292,7 +310,7 @@ url = url.replaceAll(&quot;&lt;UNTIL&gt;&quot;, String.valueOf(UNTIL));
 //log.info(url);
 //log.info(vars.get(&apos;timestamp&apos;));
 
-vars.put(&quot;url_rewrite&quot;, url);</stringProp>
+vars.put(&quot;url_1_week&quot;, url);</stringProp>
           <stringProp name="scriptLanguage">groovy</stringProp>
         </JSR223PreProcessor>
         <hashTree/>
@@ -304,7 +322,7 @@ vars.put(&quot;url_rewrite&quot;, url);</stringProp>
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">${url_rewrite}</stringProp>
+          <stringProp name="HTTPSampler.path">${url_1_week}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -314,6 +332,10 @@ vars.put(&quot;url_rewrite&quot;, url);</stringProp>
           <stringProp name="HTTPSampler.connect_timeout"></stringProp>
           <stringProp name="HTTPSampler.response_timeout"></stringProp>
         </HTTPSamplerProxy>
+        <hashTree/>
+        <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Constant Timer" enabled="true">
+          <stringProp name="ConstantTimer.delay">${delay}</stringProp>
+        </ConstantTimer>
         <hashTree/>
       </hashTree>
       <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group (3 month)" enabled="true">
@@ -349,7 +371,7 @@ url = url.replaceAll(&quot;&lt;UNTIL&gt;&quot;, String.valueOf(UNTIL));
 //log.info(url);
 //log.info(vars.get(&apos;timestamp&apos;));
 
-vars.put(&quot;url_rewrite&quot;, url);</stringProp>
+vars.put(&quot;url_3_month&quot;, url);</stringProp>
           <stringProp name="scriptLanguage">groovy</stringProp>
         </JSR223PreProcessor>
         <hashTree/>
@@ -361,7 +383,7 @@ vars.put(&quot;url_rewrite&quot;, url);</stringProp>
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">${url_rewrite}</stringProp>
+          <stringProp name="HTTPSampler.path">${url_3_month}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -372,44 +394,11 @@ vars.put(&quot;url_rewrite&quot;, url);</stringProp>
           <stringProp name="HTTPSampler.response_timeout"></stringProp>
         </HTTPSamplerProxy>
         <hashTree/>
+        <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Constant Timer" enabled="true">
+          <stringProp name="ConstantTimer.delay">${delay}</stringProp>
+        </ConstantTimer>
+        <hashTree/>
       </hashTree>
-      <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
-        <boolProp name="ResultCollector.error_logging">false</boolProp>
-        <objProp>
-          <name>saveConfig</name>
-          <value class="SampleSaveConfiguration">
-            <time>true</time>
-            <latency>true</latency>
-            <timestamp>true</timestamp>
-            <success>true</success>
-            <label>true</label>
-            <code>true</code>
-            <message>true</message>
-            <threadName>true</threadName>
-            <dataType>true</dataType>
-            <encoding>false</encoding>
-            <assertions>true</assertions>
-            <subresults>true</subresults>
-            <responseData>false</responseData>
-            <samplerData>false</samplerData>
-            <xml>false</xml>
-            <fieldNames>true</fieldNames>
-            <responseHeaders>false</responseHeaders>
-            <requestHeaders>false</requestHeaders>
-            <responseDataOnError>false</responseDataOnError>
-            <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
-            <assertionsResultsToSave>0</assertionsResultsToSave>
-            <bytes>true</bytes>
-            <sentBytes>true</sentBytes>
-            <url>true</url>
-            <threadCounts>true</threadCounts>
-            <idleTime>true</idleTime>
-            <connectTime>true</connectTime>
-          </value>
-        </objProp>
-        <stringProp name="filename">requests.csv</stringProp>
-      </ResultCollector>
-      <hashTree/>
     </hashTree>
   </hashTree>
 </jmeterTestPlan>

@@ -126,6 +126,8 @@ def main():
             if u.url not in urls_proc:
                 print(u.url)
                 urls_proc.add(u.url)
+        elif u.time_from is None:
+            print(u.url)
         else:
             print("%s %s %s" % (u.url, u.time_from, u.time_until))
 
