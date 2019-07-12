@@ -3,6 +3,7 @@
 import argparse
 import sys
 import re
+import json
 
 parser = argparse.ArgumentParser(description='Parse graphite-clickhouse and carbonapi logs and print records with time greater or with non-OK HTTP codes')
 
@@ -21,9 +22,6 @@ args = parser.parse_args()
 if args.time_gt is None and args.statuses is None:
     sys.exit("time_gt and statuses not set - what a find ?")
 
-time_p = re.compile('"%s": *([0-9]+\.[0-9]+) *(,|})' % args.time)
-status_p = re.compile('"%s": *([0-9]+) *(,|})' % args.status)
-
 if args.statuses is None:
     statuses = None
 else:
@@ -31,18 +29,22 @@ else:
 
 for line in sys.stdin:
     found = False
+    data = json.loads(line)
+    level = data.get('level')
+    if level != 'INFO':
+        continue
+
     if args.time_gt is not None:
-        m = time_p.search(line)
-        if m:
-            time_log = float(m.group(1))
-            if time_log > args.time_gt:
+        time = data.get(args.time)
+        if time:
+            if float(time) > args.time_gt:
                 found = True
 
     if not found and statuses is not None:
-        m = status_p.search(line)
-        if m:
-            status_log = int(m.group(1))
-            if status_log in statuses:
+        status = data.get(args.status)
+        if status:
+            status = int(status)
+            if status in statuses:
                 found = True
 
     if found:
