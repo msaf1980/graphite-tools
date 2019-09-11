@@ -43,11 +43,12 @@ if args.statuses is None:
 else:
     statuses = set(args.statuses)
 
+
 req_ids = set()
-query_ids = dict()
+reqs = dict()
+queries = dict()
 
 for line in sys.stdin:
-    found = False
     data = json.loads(line)
     if data.get('level') != 'INFO':
         continue
@@ -60,30 +61,32 @@ for line in sys.stdin:
             if metrics and request_id:
                 metrics = int(metrics)
                 if metrics >= args.metrics:
-                    found = True
+                    #found = True
                     try:
-                        query = query_ids[request_id]
+                        query = queries[request_id]
                         print(query)
+                        del query
                     except:
                         pass
 
-                try:
-                    del query_ids[request_id]
-                except:
-                    pass
+                    sys.stdout.write(line)
     elif message == 'render':
-        if args.size:
-            size = data.get('read_bytes')
-            if size:
-                size = int(size)
-                if size >= args.size:
-                    found = True
-                    request_id = data.get('request_id')
-                    if request_id:
-                        req_ids.add(request_id)
+        size = data.get('read_bytes')
+        if size:
+            size = int(size)
+            request_id = data.get('request_id')
+            if request_id:
+                if args.size and size >= args.size:
+                    req_ids.add(request_id)
+                reqs[request_id] = line
     elif message == 'access':
+        found = False
         request_id = data.get('request_id')
-        if request_id and request_id in req_ids:
+        req = reqs.get(request_id)
+
+        #print("'%s'" % req)
+
+        if not found and request_id in req_ids:
             req_ids.remove(request_id)
             found = True
 
@@ -102,22 +105,30 @@ for line in sys.stdin:
 
         if found:
             try:
-                query = query_ids[request_id]
+                query = queries[request_id]
                 sys.stdout.write(query)
             except:
                 pass
 
+            if req != "":
+                sys.stdout.write(req)
+
+            sys.stdout.write(line)
+
         try:
-            del query_ids[request_id]
+            del queries[request_id]
         except:
             pass
+        if req:
+            del req
     elif message == 'query':
-        if len(query_ids) < 1000:  # Overflow check
+        if len(queries) < 1000:  # Overflow check
             request_id = data.get('request_id')
-            query_ids[request_id] = line
+            if request_id:
+                queries[request_id] = line
         else:
             sys.stderr.write("OVERFLOW\n")
 
-    if found:
-        sys.stdout.write(line)
+    #if found:
+    #    sys.stdout.write(line)
 
