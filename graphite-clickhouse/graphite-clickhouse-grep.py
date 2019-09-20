@@ -44,9 +44,9 @@ else:
     statuses = set(args.statuses)
 
 
-req_ids = set()
-reqs = dict()
-queries = dict()
+req_ids = set() # request_id in queue
+reqs = dict() # render read bytes by request_id
+queries = dict() # queries by request_id
 
 for line in sys.stdin:
     data = json.loads(line)
@@ -110,7 +110,7 @@ for line in sys.stdin:
             except:
                 pass
 
-            if req != "":
+            if not req is None and req != "":
                 sys.stdout.write(req)
 
             sys.stdout.write(line)
