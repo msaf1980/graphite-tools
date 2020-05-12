@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.1.1 r1855137">
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.2.1">
   <hashTree>
     <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="graphite-clickhouse" enabled="true">
       <stringProp name="TestPlan.comments"></stringProp>
@@ -26,12 +26,12 @@
           </elementProp>
           <elementProp name="test_urls" elementType="Argument">
             <stringProp name="Argument.name">test_urls</stringProp>
-            <stringProp name="Argument.value">${__P(test_urls, test.urls)}</stringProp>
+            <stringProp name="Argument.value">${__P(urls, test.csv)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
-          <elementProp name="USERS_3_HOURS" elementType="Argument">
-            <stringProp name="Argument.name">USERS_3_HOURS</stringProp>
-            <stringProp name="Argument.value">${__P(http_users_3_hours, 5)}</stringProp>
+          <elementProp name="USERS_1_HOUR" elementType="Argument">
+            <stringProp name="Argument.name">USERS_1_HOUR</stringProp>
+            <stringProp name="Argument.value">${__P(http_users_1_hour, 10)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
           <elementProp name="USERS_1_DAY" elementType="Argument">
@@ -51,7 +51,7 @@
           </elementProp>
           <elementProp name="timestamp" elementType="Argument">
             <stringProp name="Argument.name">timestamp</stringProp>
-            <stringProp name="Argument.value">${__groovy( new Date().clearTime().getTime() / 1000 - 86400 )}</stringProp>
+            <stringProp name="Argument.value">${__groovy( new Date().clearTime().getTime()  / 1000 )}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
           <elementProp name="duration" elementType="Argument">
@@ -61,7 +61,7 @@
           </elementProp>
           <elementProp name="ramp_up" elementType="Argument">
             <stringProp name="Argument.name">ramp_up</stringProp>
-            <stringProp name="Argument.value">${__P(ramp_up, 120)}</stringProp>
+            <stringProp name="Argument.value">${__P(ramp_up, 0)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
           <elementProp name="delay" elementType="Argument">
@@ -74,6 +74,21 @@
             <stringProp name="Argument.value">${__P(timeout, 20000)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
+          <elementProp name="env" elementType="Argument">
+            <stringProp name="Argument.name">env</stringProp>
+            <stringProp name="Argument.value">${__P(env, staging)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="graphite_relay" elementType="Argument">
+            <stringProp name="Argument.name">graphite_relay</stringProp>
+            <stringProp name="Argument.value">${__P(graphite_relay, 127.0.0.1)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="metric_prefix" elementType="Argument">
+            <stringProp name="Argument.name">metric_prefix</stringProp>
+            <stringProp name="Argument.value">${__P(metric_prefix, DevOps.loadTesting.graphite )}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
         </collectionProp>
       </Arguments>
       <hashTree/>
@@ -81,9 +96,9 @@
         <stringProp name="filename">${test_urls}</stringProp>
         <stringProp name="fileEncoding">UTF-8</stringProp>
         <stringProp name="delimiter">,</stringProp>
-        <stringProp name="variableNames">url</stringProp>
+        <stringProp name="variableNames">target</stringProp>
         <boolProp name="randomOrder">true</boolProp>
-        <boolProp name="ignoreFirstLine">false</boolProp>
+        <boolProp name="ignoreFirstLine">true</boolProp>
         <boolProp name="rewindOnTheEndOfList">true</boolProp>
         <boolProp name="independentListPerThread">true</boolProp>
       </com.blazemeter.jmeter.RandomCSVDataSetConfig>
@@ -108,22 +123,27 @@
           <boolProp name="LoopController.continue_forever">false</boolProp>
           <intProp name="LoopController.loops">-1</intProp>
         </elementProp>
-        <stringProp name="ThreadGroup.num_threads">${USERS_3_HOURS}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
         <stringProp name="ThreadGroup.ramp_time">120</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">300</stringProp>
         <stringProp name="ThreadGroup.delay"></stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
       </ThreadGroup>
       <hashTree>
         <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="JSR223 PreProcessor" enabled="true">
           <stringProp name="cacheKey">true</stringProp>
           <stringProp name="filename"></stringProp>
           <stringProp name="parameters"></stringProp>
-          <stringProp name="script">Date date = new Date();
-UNTIL = (date.getTime() / 1000).intValue();
-FROM = UNTIL - 600; // - 10 min
+          <stringProp name="script">import org.apache.commons.lang3.RandomUtils;
 
-url_check = &quot;/render/?format=protobuf&amp;from=&quot; + String.valueOf(UNTIL) + &quot;&amp;target=NonExistingTarget&amp;until=&quot; + String.valueOf(FROM);
+DURATION = 3600; // 1 hour
+
+TIMESTAMP = vars.get(&apos;timestamp&apos;) as Integer;
+UNTIL = TIMESTAMP - RandomUtils.nextInt(0, 86399); // randon in day range
+FROM = UNTIL - DURATION;
+
+url_check = &quot;/render/?format=protobuf&amp;target=NonExistingTarget&amp;from=&quot; + String.valueOf(UNTIL) + &quot;&amp;until=&quot; + String.valueOf(FROM);
 
 //log.info(url_check);
 
@@ -131,7 +151,7 @@ vars.put(&quot;url_check&quot;, url_check);</stringProp>
           <stringProp name="scriptLanguage">groovy</stringProp>
         </JSR223PreProcessor>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="HTTP Request" enabled="true">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="HTTP Request (Healthcheck)" enabled="true">
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
             <collectionProp name="Arguments.arguments"/>
           </elementProp>
@@ -151,21 +171,22 @@ vars.put(&quot;url_check&quot;, url_check);</stringProp>
         </HTTPSamplerProxy>
         <hashTree/>
         <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Constant Timer" enabled="true">
-          <stringProp name="ConstantTimer.delay">${delay}</stringProp>
+          <stringProp name="ConstantTimer.delay">500</stringProp>
         </ConstantTimer>
         <hashTree/>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group (3 hours)" enabled="true">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group (1 Hour)" enabled="true">
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
           <boolProp name="LoopController.continue_forever">false</boolProp>
           <intProp name="LoopController.loops">-1</intProp>
         </elementProp>
-        <stringProp name="ThreadGroup.num_threads">${USERS_3_HOURS}</stringProp>
-        <stringProp name="ThreadGroup.ramp_time">120</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${USERS_1_HOUR}</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">${ramp_up}</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">300</stringProp>
+        <stringProp name="ThreadGroup.duration">${duration}</stringProp>
         <stringProp name="ThreadGroup.delay"></stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
       </ThreadGroup>
       <hashTree>
         <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="JSR223 PreProcessor" enabled="true">
@@ -176,23 +197,25 @@ vars.put(&quot;url_check&quot;, url_check);</stringProp>
 
 DURATION = 3600; // 1 hour
 
-TIMESTAMP = vars.get(&apos;timestamp&apos;) as Integer
-UNTIL = TIMESTAMP + RandomUtils.nextInt(0, 86399); // randon in day range
+TIMESTAMP = vars.get(&apos;timestamp&apos;) as Integer;
+UNTIL = TIMESTAMP - RandomUtils.nextInt(0, 86399); // randon in day range
 FROM = UNTIL - DURATION;
 
-url = vars.get(&quot;url&quot;);
+target = vars.get(&apos;target&apos;);
 
-url = url.replaceAll(&quot;&lt;FROM&gt;&quot;, String.valueOf(FROM));
-url = url.replaceAll(&quot;&lt;UNTIL&gt;&quot;, String.valueOf(UNTIL));
+url = &quot;/render/?format=protobuf&quot; + target + &quot;&amp;from=&quot; + String.valueOf(FROM) + &quot;&amp;until=&quot; + String.valueOf(UNTIL);
+
+//url = url.replaceAll(&quot;&lt;FROM&gt;&quot;, String.valueOf(FROM));
+//url = url.replaceAll(&quot;&lt;UNTIL&gt;&quot;, String.valueOf(UNTIL));
 
 //log.info(url);
 
-vars.put(&quot;url_3_hour&quot;, url);
+vars.put(&quot;url_1_hour&quot;, url);
 </stringProp>
           <stringProp name="scriptLanguage">groovy</stringProp>
         </JSR223PreProcessor>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="HTTP Request" enabled="true">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="HTTP Request (1 Hour)" enabled="true">
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
             <collectionProp name="Arguments.arguments"/>
           </elementProp>
@@ -200,7 +223,7 @@ vars.put(&quot;url_3_hour&quot;, url);
           <stringProp name="HTTPSampler.port"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">${url_3_hour}</stringProp>
+          <stringProp name="HTTPSampler.path">${url_1_hour}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -216,7 +239,7 @@ vars.put(&quot;url_3_hour&quot;, url);
         </ConstantTimer>
         <hashTree/>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group (1 day)" enabled="true">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group (1 Day)" enabled="true">
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
           <boolProp name="LoopController.continue_forever">false</boolProp>
@@ -227,6 +250,7 @@ vars.put(&quot;url_3_hour&quot;, url);
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${duration}</stringProp>
         <stringProp name="ThreadGroup.delay"></stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
       </ThreadGroup>
       <hashTree>
         <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="JSR223 PreProcessor" enabled="true">
@@ -238,13 +262,15 @@ vars.put(&quot;url_3_hour&quot;, url);
 DURATION = 86400; // 1 day
 
 TIMESTAMP = vars.get(&apos;timestamp&apos;) as Integer
-UNTIL = TIMESTAMP + RandomUtils.nextInt(0, 86399); // randon in day range
+UNTIL = TIMESTAMP - RandomUtils.nextInt(0, 86399); // randon in day range
 FROM = UNTIL - DURATION;
 
-url = vars.get(&quot;url&quot;);
+target = vars.get(&apos;target&apos;);
 
-url = url.replaceAll(&quot;&lt;FROM&gt;&quot;, String.valueOf(FROM));
-url = url.replaceAll(&quot;&lt;UNTIL&gt;&quot;, String.valueOf(UNTIL));
+url = &quot;/render/?format=protobuf&quot; + target + &quot;&amp;from=&quot; + String.valueOf(FROM) + &quot;&amp;until=&quot; + String.valueOf(UNTIL);
+
+//url = url.replaceAll(&quot;&lt;FROM&gt;&quot;, String.valueOf(FROM));
+//url = url.replaceAll(&quot;&lt;UNTIL&gt;&quot;, String.valueOf(UNTIL));
 
 //log.info(url);
 //log.info(vars.get(&apos;timestamp&apos;));
@@ -253,7 +279,7 @@ vars.put(&quot;url_1_day&quot;, url);</stringProp>
           <stringProp name="scriptLanguage">groovy</stringProp>
         </JSR223PreProcessor>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="HTTP Request" enabled="true">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="HTTP Request (1 Day)" enabled="true">
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
             <collectionProp name="Arguments.arguments"/>
           </elementProp>
@@ -277,7 +303,7 @@ vars.put(&quot;url_1_day&quot;, url);</stringProp>
         </ConstantTimer>
         <hashTree/>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group (1 week)" enabled="true">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group (1 Week)" enabled="true">
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
           <boolProp name="LoopController.continue_forever">false</boolProp>
@@ -288,6 +314,7 @@ vars.put(&quot;url_1_day&quot;, url);</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${duration}</stringProp>
         <stringProp name="ThreadGroup.delay"></stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
       </ThreadGroup>
       <hashTree>
         <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="JSR223 PreProcessor" enabled="true">
@@ -299,13 +326,15 @@ vars.put(&quot;url_1_day&quot;, url);</stringProp>
 DURATION = 604800; // 7 days
 
 TIMESTAMP = vars.get(&apos;timestamp&apos;) as Integer
-UNTIL = TIMESTAMP + RandomUtils.nextInt(0, 86399); // randon in day range
+UNTIL = TIMESTAMP - RandomUtils.nextInt(0, 86399); // randon in day range
 FROM = UNTIL - DURATION;
 
-url = vars.get(&quot;url&quot;);
+target = vars.get(&apos;target&apos;);
 
-url = url.replaceAll(&quot;&lt;FROM&gt;&quot;, String.valueOf(FROM));
-url = url.replaceAll(&quot;&lt;UNTIL&gt;&quot;, String.valueOf(UNTIL));
+url = &quot;/render/?format=protobuf&quot; + target + &quot;&amp;from=&quot; + String.valueOf(FROM) + &quot;&amp;until=&quot; + String.valueOf(UNTIL);
+
+//url = url.replaceAll(&quot;&lt;FROM&gt;&quot;, String.valueOf(FROM));
+//url = url.replaceAll(&quot;&lt;UNTIL&gt;&quot;, String.valueOf(UNTIL));
 
 //log.info(url);
 //log.info(vars.get(&apos;timestamp&apos;));
@@ -314,7 +343,7 @@ vars.put(&quot;url_1_week&quot;, url);</stringProp>
           <stringProp name="scriptLanguage">groovy</stringProp>
         </JSR223PreProcessor>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="HTTP Request" enabled="true">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="HTTP Request (1 Week)" enabled="true">
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
             <collectionProp name="Arguments.arguments"/>
           </elementProp>
@@ -338,7 +367,7 @@ vars.put(&quot;url_1_week&quot;, url);</stringProp>
         </ConstantTimer>
         <hashTree/>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group (3 month)" enabled="true">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group (3 Month)" enabled="true">
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
           <boolProp name="LoopController.continue_forever">false</boolProp>
@@ -349,6 +378,7 @@ vars.put(&quot;url_1_week&quot;, url);</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${duration}</stringProp>
         <stringProp name="ThreadGroup.delay"></stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
       </ThreadGroup>
       <hashTree>
         <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="JSR223 PreProcessor" enabled="true">
@@ -360,13 +390,15 @@ vars.put(&quot;url_1_week&quot;, url);</stringProp>
 DURATION = 7776000; // 90 days
 
 TIMESTAMP = vars.get(&apos;timestamp&apos;) as Integer
-UNTIL = TIMESTAMP + RandomUtils.nextInt(0, 86399); // randon in day range
+UNTIL = TIMESTAMP - RandomUtils.nextInt(0, 86399); // randon in day range
 FROM = UNTIL - DURATION;
 
-url = vars.get(&quot;url&quot;);
+target = vars.get(&apos;target&apos;);
 
-url = url.replaceAll(&quot;&lt;FROM&gt;&quot;, String.valueOf(FROM));
-url = url.replaceAll(&quot;&lt;UNTIL&gt;&quot;, String.valueOf(UNTIL));
+url = &quot;/render/?format=protobuf&quot; + target + &quot;&amp;from=&quot; + String.valueOf(FROM) + &quot;&amp;until=&quot; + String.valueOf(UNTIL);
+
+//url = url.replaceAll(&quot;&lt;FROM&gt;&quot;, String.valueOf(FROM));
+//url = url.replaceAll(&quot;&lt;UNTIL&gt;&quot;, String.valueOf(UNTIL));
 
 //log.info(url);
 //log.info(vars.get(&apos;timestamp&apos;));
@@ -375,7 +407,7 @@ vars.put(&quot;url_3_month&quot;, url);</stringProp>
           <stringProp name="scriptLanguage">groovy</stringProp>
         </JSR223PreProcessor>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="HTTP Request" enabled="true">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="HTTP Request (3 Month)" enabled="true">
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
             <collectionProp name="Arguments.arguments"/>
           </elementProp>
@@ -399,6 +431,49 @@ vars.put(&quot;url_3_month&quot;, url);</stringProp>
         </ConstantTimer>
         <hashTree/>
       </hashTree>
+      <BackendListener guiclass="BackendListenerGui" testclass="BackendListener" testname="Backend Listener" enabled="true">
+        <elementProp name="arguments" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" enabled="true">
+          <collectionProp name="Arguments.arguments">
+            <elementProp name="graphiteMetricsSender" elementType="Argument">
+              <stringProp name="Argument.name">graphiteMetricsSender</stringProp>
+              <stringProp name="Argument.value">org.apache.jmeter.visualizers.backend.graphite.TextGraphiteMetricsSender</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="graphiteHost" elementType="Argument">
+              <stringProp name="Argument.name">graphiteHost</stringProp>
+              <stringProp name="Argument.value">${graphite_relay}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="graphitePort" elementType="Argument">
+              <stringProp name="Argument.name">graphitePort</stringProp>
+              <stringProp name="Argument.value">2003</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="rootMetricsPrefix" elementType="Argument">
+              <stringProp name="Argument.name">rootMetricsPrefix</stringProp>
+              <stringProp name="Argument.value">${metric_prefix}.${env}.graphite-clickhouse.</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="summaryOnly" elementType="Argument">
+              <stringProp name="Argument.name">summaryOnly</stringProp>
+              <stringProp name="Argument.value">false</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="samplersList" elementType="Argument">
+              <stringProp name="Argument.name">samplersList</stringProp>
+              <stringProp name="Argument.value"></stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="percentiles" elementType="Argument">
+              <stringProp name="Argument.name">percentiles</stringProp>
+              <stringProp name="Argument.value">90;95;99</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </elementProp>
+        <stringProp name="classname">org.apache.jmeter.visualizers.backend.graphite.GraphiteBackendListenerClient</stringProp>
+      </BackendListener>
+      <hashTree/>
     </hashTree>
   </hashTree>
 </jmeterTestPlan>
