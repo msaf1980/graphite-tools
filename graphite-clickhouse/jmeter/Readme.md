@@ -15,8 +15,9 @@ http_users_3_month   1
 
 
 Run in cli mode
-    jmeter.sh -Jhttp_addr=test-graphite-s1 -Jhttp_users_1_hour=0 -Jgraphite_relay=graphite-relay -n -t graphite-clickhouse.jmx -l results.csv
+    mkdir report
+    jmeter.sh -Jhttp_addr=test-graphite-s1 -Jhttp_users_1_hour=0 -Jgraphite_relay=graphite-relay -n -t graphite-clickhouse.jmx -l report/results.csv
 
 For generate html report
-    mkdir report
-    jmeter.sh  -g results.csv -o report
+    mkdir -p report/jmeter
+    jmeter.sh  -g results.csv -o report/jmeter
