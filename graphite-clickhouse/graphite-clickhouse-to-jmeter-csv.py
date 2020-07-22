@@ -33,8 +33,14 @@ WEEK = DAY * 7
 MONTH = DAY * 30
 YEAR = DAY * 365
 
-queries = dict()
+class Stat:
+    def __init__(self, dt, elapsed):
+        self.dt = dt
+        self.elapsed = elapsed
+        self.bytes = 0
 
+queries = dict()
+queriesDict = dict()
 
 def durations(duration):
     d = round(duration / YEAR)
@@ -66,6 +72,19 @@ def parse_line(line):
         return
     if json_line['message'] is None:
         return
+    elif json_line['message'] == 'query':
+        try:
+            id = json_line['request_id']
+            query = json_line['query']
+        except:
+            pass
+        dt = int(dateutil.parser.parse(json_line['timestamp']).timestamp() * 1000)
+        if query.startswith('SELECT Path FROM '):
+            # SELECT Path FROM graphite_index WHERE (Level = 10004) AND (Path = 'total.activity.test.cloud' OR Path = 'total.activity.zebra.KE-cloud.') AND (Date >='2020-06-05' AND Date <= '2020-06-05') GROUP BY Path
+            # SELECT Path FROM graphite_index WHERE (Level = 20007) AND (Path LIKE 'TEST.apps.namespaces.PAYMENT.%') AND (Date = '1970-02-12') GROUP BY Path
+            queriesDict[id] = Stat(dt, int(1000 * float(json_line['time'])))
+
+        return
     elif json_line['message'] == 'render':
         try:
             id = json_line['request_id']
@@ -75,45 +94,52 @@ def parse_line(line):
             pass
         return
     elif json_line['message'] == 'finder':
+        # {"level":"INFO","timestamp":"2020-06-05T07:20:12.088+0300","message":"finder","request_id":"a69e4339110ccc360f22c47183e956fe","metrics":20}
         try:
             id = json_line['request_id']
-            bytes = int(json_line['metrics'])
-            queries[id] = bytes
+            queriesDict[id].bytes = int(json_line['metrics'])
         except:
             pass
         return
     elif json_line['message'] != 'access':
         return
-    if json_line['url'].startswith('/metrics/find/?'):
-      label = "FIND"
-    elif not json_line['url'].startswith('/render/?'):
-        return
+   
+    try:
+        if json_line['url'].startswith('/metrics/find/?'):
+            label = "FIND (METRICS)"
+        elif not json_line['url'].startswith('/render/?'):
+            return
 
-    id = json_line['request_id']
-    dt = int(dateutil.parser.parse(json_line['timestamp']).timestamp() * 1000)
-    elapsed = int(1000 * float(json_line['time']))
-    responceCode = int(json_line['status'])
-    if responceCode == 200:
-        responceMsg = "OK"
-        success = "true"
-    elif responceCode == 403:
-        responceMsg = "Forbidden"
-        success = "false"
-    elif responceCode == 404:
-        responceMsg = "Not found"
-        success = "false"
-    else:
-        responceMsg = "Error"
-        success = "false"
+        id = json_line['request_id']
+        dt = int(dateutil.parser.parse(json_line['timestamp']).timestamp() * 1000)
+        elapsed = int(1000 * float(json_line['time']))
+        responceCode = int(json_line['status'])
+        if responceCode == 200:
+            responceMsg = "OK"
+            success = "true"
+        elif responceCode == 403:
+            responceMsg = "Forbidden"
+            success = "false"
+        elif responceCode == 404:
+            responceMsg = "Not found"
+            success = "false"
+        else:
+            responceMsg = "Error"
+            success = "false"
 
-    url = json_line['url']
-    parsed = urlparse.urlparse(url)
-    params = urlparse.parse_qs(parsed.query)
-    
-    if len(params) > 0:
-        try:
-            if label == "FIND":
+        url = json_line['url']
+        parsed = urlparse.urlparse(url)
+        params = urlparse.parse_qs(parsed.query)
+
+        if len(params) > 0:
+
+            if label == "FIND (METRICS)":
                 url = params['query'][0]
+                try:
+                    bytes = queriesDict[id].bytes
+                    del queriesDict[id]
+                except:
+                    bytes = 0
             elif label == "RENDER":
                 # NonExistingTarget
                 if params['target'][0] != 'NonExistingTarget':
@@ -129,24 +155,22 @@ def parse_line(line):
 
                 fromTime = int(params['from'][0])
                 untilTime = int(params['until'][0])
-                label += " " + durations(untilTime - fromTime)
-
-                #print("%s %s %d" % (fromTime, untilTime, bytes))
-            else:
-                # %2A
-                # NonExistingTarget
-                if params['query'][0] != 'NonExistingTarget':
-                    next
+                d = durations(untilTime - fromTime)
+                label += " " + d
 
                 try:
-                    fromTime = int(params['from'][0])
-                    untilTime = int(params['until'][0])
-                    label += " " + durations(untilTime - fromTime)
+                    stat = queriesDict[id]
+                    labelFind = "FIND " + d
+                    sys.stdout.write("%s,%s,%s,%s,%s,Live,,%s,,%d,%d,1,1,\"%s\",%s,0,0\n" % (
+                        stat.dt, stat.elapsed, labelFind, "200", "OK",
+                        "true",
+                        stat.bytes, 0,
+                        url, stat.elapsed
+                    ))
                 except:
                     pass
-
-                #query = urlparse.quote_plus(params['query'][0])
-
+            else:
+                next
 
             #ts,elapsed,label,respCode,respMsg,threadName,dataType,success,failureMessage,bytes,sentBytes,grpThreads,allThreads,URL,Latency,IdleTime,Connect
             sys.stdout.write("%s,%s,%s,%s,%s,Live,,%s,,%d,%d,1,1,\"%s\",%s,0,0\n" % (
@@ -156,12 +180,12 @@ def parse_line(line):
                 url, elapsed
             ))
 
-        except BrokenPipeError as e:
-            raise e
-        except Exception as e:
-            filename, line = get_exception_loc()
-            sys.stderr.write("ERROR (%s): %s: %s\n" % (line, str(e), line))
-            next
+    except BrokenPipeError as e:
+        raise e
+    except Exception as e:
+        filename, line = get_exception_loc()
+        sys.stderr.write("ERROR (%s): %s: %s\n" % (line, str(e), line))
+        next
 
 
 def main():
