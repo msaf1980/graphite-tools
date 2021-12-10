@@ -26,7 +26,7 @@
           </elementProp>
           <elementProp name="test_urls" elementType="Argument">
             <stringProp name="Argument.name">test_urls</stringProp>
-            <stringProp name="Argument.value">${__P(urls, metrics.txt)}</stringProp>
+            <stringProp name="Argument.value">${__P(urls, carbonapi.txt)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
           <elementProp name="USERS_1_HOUR" elementType="Argument">
