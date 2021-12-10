@@ -1,19 +1,30 @@
+#!/usr/bin/env python3
+
 import argparse
 from datetime import datetime
 from datetime import timedelta
 import pandas as pd
 import numpy as np
 
+try:
+    import urllib.parse as urlparse
+except:
+    import urlparse
+
 import matplotlib.pyplot as plt
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
 
 # aggregate in timestamp (in seconds)
-roundTo = 30
+roundTo = 10
 
 
 def p95(g):
     return np.percentile(g, 95)
+
+
+def p99(g):
+    return np.percentile(g, 99)
 
 
 def parse_cmdline():
@@ -31,8 +42,9 @@ def parse_cmdline():
 
 
 def responce_code_clean(x):
-    if x.startswith("Non HTTP response code: "):
-        s = x[24:]
+    s = str(x)
+    if s.startswith("Non HTTP response code: "):
+        s = s[24:]
         loc = s.rfind('.')
         if loc >= 0:
             s = s[loc + 1:]
@@ -40,56 +52,49 @@ def responce_code_clean(x):
             s = s[:-9]
         return s
     else:
-        return x
+        return s
 
 
-def saveSummary(dfs, statusCodes, colorCodes):
-    resultSum = dict()
+def url_extract_target(x):
+    parsed = urlparse.urlparse(x)
+    params = urlparse.parse_qs(parsed.query)
+    return urlparse.unquote(params['target'][0])
+
+
+def aggregate_total(dfs):
+    result = pd.pivot_table(
+            dfs,
+            values=['Latency', 'bytes'],
+            #index=['time', 'threadName', 'responseCode'],
+            index=['time'],
+            aggfunc={
+                'bytes': [len, min, max, np.mean, p95, p99],
+                'Latency': [min, max, np.mean, p95, p99],
+            })
+
+    print("Total")
+    print(result)
+
+    return result
+
+
+def aggregate_by_code(dfs, statusCodes):
+    result = dict()
     for code in statusCodes:
-        resultSum[code] = pd.pivot_table(
+        result[code] = pd.pivot_table(
             dfs[dfs.responseCode == code],
             values=['Latency', 'bytes'],
             #index=['time', 'threadName', 'responseCode'],
             index=['time'],
             aggfunc={
-                'bytes': [min, max, np.mean, p95],
-                'Latency': [len, min, max, np.mean, p95]
+                'bytes': [len, min, max, np.mean, p95, p99],
+                'Latency': [min, max, np.mean, p95, p99],
             })
 
-        #print(resultSum[code])
+        print(code)
+        print(result[code])
 
-    markerfmt = '.'
-
-    ################################
-    # RPS
-
-    plt.xlabel('time')
-    plt.ylabel('RPS')
-
-    # Turn on the minor TICKS, which are required for the minor GRID
-    plt.minorticks_on()
-    # Customize the major grid
-    plt.grid(which='major', linestyle='-', linewidth=0.5)
-    # Customize the minor grid
-    plt.grid(which='minor', linestyle=':', linewidth=0.5)
-
-    for k in resultSum:
-        markerline, stemlines, baseline = plt.stem(
-            resultSum[k].index,
-            resultSum[k]['Latency'].len / roundTo,
-            markerfmt=markerfmt)
-        plt.setp(baseline, 'markerfacecolor', colorCodes[k])
-        plt.setp(markerline, 'markerfacecolor', colorCodes[k])
-
-        plt.setp(stemlines, 'linestyle', 'dotted')
-
-    plt.legend(statusCodes, loc='upper left')
-
-    plt.savefig("rps.png", dpi=300)
-    plt.close()
-
-    # RPS
-    ################################
+    return result
 
 
 def main():
@@ -114,25 +119,30 @@ def main():
     dfs['threadName'] = dfs['threadName'].apply(lambda x: x[0:x.rfind(' ')])
     dfs['responseCode'] = dfs['responseCode'].apply(
         responce_code_clean)  # cleanup responce codes
+    dfs['URL'] = dfs['URL'].apply(
+        url_extract_target)  # extract target
+
 
     dfs.index = pd.to_datetime(dfs.index, unit='ms')
 
     dfs['time'] = dfs.index.round("%ds" % roundTo)  # rounded time
-    #rpsLegend = ["Total"]
 
-    #print(resultSum)
+    #rpsLegend = ["Total"]
 
     #print(dfs.to_string())
 
     statusCodes = dfs['responseCode'].unique()
-    colorCodes = dict()
-    for code in statusCodes:
-        if code == '200':
-            colorCodes[code] = 'green'
-        elif code == 'ConnectTimeout':
-            colorCodes[code] = 'red'
+    #colorCodes = dict()
+    #for code in statusCodes:
+    #    if code == '200':
+    #        colorCodes[code] = 'green'
+    #    elif code == 'ConnectTimeout':
+    #        colorCodes[code] = 'red'
 
-    saveSummary(dfs, statusCodes, colorCodes)
+    aggregate_total(dfs)
+    aggregate_by_code(dfs, statusCodes)
+
+    #print(dfs)
 
 
 if __name__ == "__main__":

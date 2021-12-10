@@ -131,15 +131,18 @@ def parse_line(line):
         parsed = urlparse.urlparse(url)
         params = urlparse.parse_qs(parsed.query)
 
+        p = []
         if len(params) > 0:
 
             if label == "FIND (METRICS)":
-                url = params['query'][0]
+                for q in params['query']:
+                    p.append(q)
                 try:
                     bytes = queriesDict[id].bytes
                     del queriesDict[id]
                 except:
                     bytes = 0
+                url = "&".join(p)
             elif label == "RENDER":
                 # NonExistingTarget
                 if params['target'][0] != 'NonExistingTarget':

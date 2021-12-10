@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-# Extract queries in graphite-clickhouse logs
+# Extract queries from carbonapi logs
 
 import sys
 import re
@@ -69,22 +69,26 @@ def timestamp_tz(param, tz):
 
 def parse_line(line):
     json_line = json.loads(line)
-    if json_line['level'] is None or json_line['level'] != 'INFO':
+    if json_line.get('level') is None or json_line['level'] != 'INFO':
         return
-    if json_line['message'] is None or json_line['message'] != 'access':
+    if json_line.get('logger') is None or json_line['logger'] != 'access':
         return
-    if not json_line['url'].startswith('/render/'):
+    if json_line.get('data') is None or not json_line['data']['url'].startswith('/render'):
+        return
+    if json_line['data'].get('targets') is None:
         return
 
     dt = dateutil.parser.parse(json_line['timestamp'])
     json_line['time'] = int(timestamp(dt))
 
-    parsed = urlparse.urlparse(json_line['url'])
-    params = urlparse.parse_qs(parsed.query)
-    if len(params) > 0:
-        url = '&target=' + quote_plus(params['target'][0])
-        if url != '&target=NonExistingTarget' and url not in urls:
-            urls.add(url)
+    for target in json_line['data']['targets']:
+        try:
+            url = '&target=' + quote_plus(target)
+
+            if url not in urls:
+                urls.add(url)
+        except:
+            pass
 
 
 def main():
@@ -92,7 +96,7 @@ def main():
         parse_line(line)
 
     # PrintCSV header
-    print('target')
+    print('#target')
 
     for u in urls:
         print("%s" % u)
