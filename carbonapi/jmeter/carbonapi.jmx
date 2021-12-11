@@ -96,7 +96,7 @@
         <stringProp name="filename">${test_urls}</stringProp>
         <stringProp name="fileEncoding">UTF-8</stringProp>
         <stringProp name="delimiter">,</stringProp>
-        <stringProp name="variableNames">#target</stringProp>
+        <stringProp name="variableNames">target</stringProp>
         <boolProp name="randomOrder">true</boolProp>
         <boolProp name="ignoreFirstLine">true</boolProp>
         <boolProp name="rewindOnTheEndOfList">true</boolProp>
